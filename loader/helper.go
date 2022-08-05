@@ -5,17 +5,21 @@ import (
 	"path/filepath"
 )
 
-func buffer(pat string) []string {
+func buffer(p string) []string {
 	var err error
 
 	var buf []string
 
-	err = filepath.Walk(pat, func(pat string, inf fs.FileInfo, err error) error {
+	err = filepath.Walk(p, func(pat string, inf fs.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
-		if inf.Name() == pat {
+		if pat == p {
+			return nil
+		}
+
+		if !inf.IsDir() {
 			return nil
 		}
 
