@@ -50,9 +50,13 @@ type Loader struct {
 }
 
 func (l *Loader) Execute() ([]byte, error) {
+	{
+		l.configs()
+	}
+
 	var buf bytes.Buffer
 	{
-		t, err := template.New(l.Fil.Name()).Parse(l.Tem)
+		t, err := template.New("loader").Parse(l.Tem)
 		if err != nil {
 			return nil, tracer.Mask(err)
 		}
