@@ -8,12 +8,15 @@ type Fitter interface {
 // Loader describes how boosters can be restored and used for predictions.
 //
 //     ldr := &loader.Loader{
+//         Buc: []string{ ... },
 //         Pat: "/Users/xh3b4sd/dat/",
 //         Por: 8080,
-//         Tem: "<template.py>",
 //     }
 //
 type Loader interface {
+	// Execute returns the rendered template of the Python script used to spawn
+	// a child process for predictions.
+	Execute() ([]byte, error)
 	// Restore loads an ensemble of layered models originally saved in universal
 	// binary JSON format via the "save_model" Python API of XGBoost. Suppose
 	// having trained and saved 3 models in Python, namely a, b and c.

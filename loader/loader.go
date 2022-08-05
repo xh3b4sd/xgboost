@@ -18,6 +18,8 @@ import (
 
 type Loader struct {
 	Add string
+	// Buc is the required bucket list.
+	Buc []string
 	Cli *http.Client
 	Cmd *exec.Cmd
 	Fil *os.File
@@ -47,31 +49,36 @@ type Loader struct {
 	Url string
 }
 
+func (l *Loader) Execute() ([]byte, error) {
+	var buf bytes.Buffer
+	{
+		t, err := template.New(l.Fil.Name()).Parse(l.Tem)
+		if err != nil {
+			return nil, tracer.Mask(err)
+		}
+
+		err = t.Execute(&buf, l.mapping())
+		if err != nil {
+			return nil, tracer.Mask(err)
+		}
+	}
+
+	return buf.Bytes(), nil
+}
+
 func (l *Loader) Restore() error {
 	var err error
 
-	if l.Add == "" {
-		l.Add = "localhost"
+	{
+		l.configs()
 	}
 
-	if l.Cli == nil {
-		l.Cli = &http.Client{}
-	}
-
-	if l.Pat == "" {
-		panic("Loader.Pat must not be empty")
-	}
-
-	if l.Por == 0 {
-		panic("Loader.Por must not be empty")
-	}
-
-	if l.Tem == "" {
-		panic("Loader.Tem must not be empty")
-	}
-
-	if l.Url == "" {
-		l.Url = fmt.Sprintf("http://%s:%d", l.Add, l.Por)
+	var byt []byte
+	{
+		byt, err = l.Execute()
+		if err != nil {
+			return tracer.Mask(err)
+		}
 	}
 
 	{
@@ -81,21 +88,8 @@ func (l *Loader) Restore() error {
 		}
 	}
 
-	var buf bytes.Buffer
 	{
-		t, err := template.New(l.Fil.Name()).Parse(l.Tem)
-		if err != nil {
-			return tracer.Mask(err)
-		}
-
-		err = t.Execute(&buf, l.data())
-		if err != nil {
-			return tracer.Mask(err)
-		}
-	}
-
-	{
-		_, err := l.Fil.Write(buf.Bytes())
+		_, err := l.Fil.Write(byt)
 		if err != nil {
 			return tracer.Mask(err)
 		}
@@ -236,9 +230,40 @@ func (l *Loader) checker() bool {
 	return strings.TrimSpace(string(bod)) == "OK"
 }
 
-func (l *Loader) data() map[string]interface{} {
+func (l *Loader) configs() {
+	if l.Add == "" {
+		l.Add = "localhost"
+	}
+
+	if len(l.Buc) == 0 {
+		panic("Loader.Buc must not be empty")
+	}
+
+	if l.Cli == nil {
+		l.Cli = &http.Client{}
+	}
+
+	if l.Pat == "" {
+		panic("Loader.Pat must not be empty")
+	}
+
+	if l.Por == 0 {
+		panic("Loader.Por must not be empty")
+	}
+
+	if l.Tem == "" {
+		l.Tem = deftem
+	}
+
+	if l.Url == "" {
+		l.Url = fmt.Sprintf("http://%s:%d", l.Add, l.Por)
+	}
+}
+
+func (l *Loader) mapping() map[string]interface{} {
 	return map[string]interface{}{
 		"Add": l.Add,
+		"Buc": l.Buc,
 		"Buf": buffer(l.Pat),
 		"Pat": strings.TrimSuffix(l.Pat, "/"),
 		"Por": l.Por,
