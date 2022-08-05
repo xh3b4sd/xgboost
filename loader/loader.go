@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/xh3b4sd/tracer"
 )
@@ -74,7 +75,7 @@ func (l *Loader) Restore() error {
 	}
 
 	{
-		l.Fil, err = os.CreateTemp("", "*")
+		l.Fil, err = os.CreateTemp("", "xgboost-loader-template-*")
 		if err != nil {
 			return tracer.Mask(err)
 		}
@@ -114,7 +115,7 @@ func (l *Loader) Restore() error {
 	go func() {
 		err := l.Cmd.Wait()
 		if err != nil {
-			fmt.Printf("%#v\n", err)
+			fmt.Printf("%s - %s\n", l.Fil.Name(), err.Error())
 		}
 	}()
 
@@ -122,6 +123,16 @@ func (l *Loader) Restore() error {
 		err := l.Fil.Close()
 		if err != nil {
 			return tracer.Mask(err)
+		}
+	}
+
+	for {
+		if l.checker() {
+			break
+		}
+
+		{
+			time.After(3 * time.Second)
 		}
 	}
 
@@ -192,6 +203,37 @@ func (l *Loader) Sigkill() error {
 	}
 
 	return nil
+}
+
+func (l *Loader) checker() bool {
+	var err error
+
+	var req *http.Request
+	{
+		req, err = http.NewRequest("GET", l.Url, nil)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	var res *http.Response
+	{
+		res, err = l.Cli.Do(req)
+		if err != nil {
+			return false
+		}
+		defer res.Body.Close()
+	}
+
+	var bod []byte
+	{
+		bod, err = ioutil.ReadAll(res.Body)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	return strings.TrimSpace(string(bod)) == "OK"
 }
 
 func (l *Loader) data() map[string]interface{} {
