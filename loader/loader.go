@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"text/template"
@@ -75,6 +76,7 @@ func (l *Loader) Restore() error {
 
 	{
 		l.configs()
+		l.cleanup()
 	}
 
 	var byt []byte
@@ -131,6 +133,13 @@ func (l *Loader) Restore() error {
 
 		{
 			time.After(3 * time.Second)
+		}
+	}
+
+	{
+		err = ioutil.WriteFile(l.pidfilp(), l.pidfilb(), 0664)
+		if err != nil {
+			return tracer.Mask(err)
 		}
 	}
 
@@ -234,6 +243,33 @@ func (l *Loader) checker() bool {
 	return strings.TrimSpace(string(bod)) == "OK"
 }
 
+func (l *Loader) cleanup() {
+	exi := exists(l.pidfilp())
+	if !exi {
+		return
+	}
+
+	pro, err := os.FindProcess(l.pidfili())
+	if err != nil {
+		panic(err)
+	}
+
+	err = pro.Kill()
+	if err != nil {
+		panic(err)
+	}
+
+	_, err = pro.Wait()
+	if err != nil {
+		panic(err)
+	}
+
+	err = os.Remove(l.pidfilp())
+	if err != nil {
+		panic(err)
+	}
+}
+
 func (l *Loader) configs() {
 	if l.Add == "" {
 		l.Add = "localhost"
@@ -272,4 +308,26 @@ func (l *Loader) mapping() map[string]interface{} {
 		"Pat": strings.TrimSuffix(l.Pat, "/"),
 		"Por": l.Por,
 	}
+}
+
+func (l *Loader) pidfilb() []byte {
+	return []byte(fmt.Sprintf("%d", l.Cmd.Process.Pid))
+}
+
+func (l *Loader) pidfili() int {
+	byt, err := ioutil.ReadFile(l.pidfilp())
+	if err != nil {
+		panic(err)
+	}
+
+	pid, err := strconv.Atoi(strings.TrimSpace(string(byt)))
+	if err != nil {
+		panic(err)
+	}
+
+	return pid
+}
+
+func (l *Loader) pidfilp() string {
+	return filepath.Join(l.Pat, "loader.pid")
 }
