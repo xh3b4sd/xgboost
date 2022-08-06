@@ -255,13 +255,30 @@ func (l *Loader) cleanup() {
 	}
 
 	err = pro.Kill()
-	if err != nil {
+	if IsProcessAlreadyFinished(err) {
+		// fall through
+	} else if err != nil {
 		panic(err)
 	}
 
-	_, err = pro.Wait()
-	if err != nil {
-		panic(err)
+	for {
+		// In case a pidfile was found we deal with an orphaned process that
+		// will never be a child process of the current process inspecting the
+		// orphan. Process.Wait will therefore always return an error, which we
+		// simply ignore. All we care about is the exit information of the
+		// orphan.
+		//
+		//     wait: no child processes
+		//
+		sta, _ := pro.Wait()
+		fmt.Printf("%#v\n", sta)
+		if sta.Exited() {
+			break
+		}
+
+		{
+			time.After(3 * time.Second)
+		}
 	}
 
 	err = os.Remove(l.pidfilp())
@@ -311,7 +328,7 @@ func (l *Loader) mapping() map[string]interface{} {
 }
 
 func (l *Loader) pidfilb() []byte {
-	return []byte(fmt.Sprintf("%d", l.Cmd.Process.Pid))
+	return []byte(fmt.Sprintf("%d\n", l.Cmd.Process.Pid))
 }
 
 func (l *Loader) pidfili() int {
