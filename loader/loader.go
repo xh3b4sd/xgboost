@@ -208,28 +208,7 @@ func (l *Loader) Predict(inp map[string][]float32) (float32, error) {
 }
 
 func (l *Loader) Sigkill() error {
-	var err error
-
-	err = l.Cmd.Process.Kill()
-	if err != nil {
-		return tracer.Mask(err)
-	}
-
-	err = os.Remove(l.Fil.Name())
-	if err != nil {
-		return tracer.Mask(err)
-	}
-
-	err = os.Remove(l.pidfilp())
-	if err != nil {
-		return tracer.Mask(err)
-	}
-
-	err = os.Remove(l.temfilp())
-	if err != nil {
-		return tracer.Mask(err)
-	}
-
+	l.cleanup()
 	return nil
 }
 
