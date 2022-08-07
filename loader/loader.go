@@ -23,6 +23,7 @@ type Loader struct {
 	Buc []string
 	Cli *http.Client
 	Cmd *exec.Cmd
+	Deb bool
 	Fil *os.File
 	// Pat is the required data path containing all ensemble data.
 	//
@@ -103,6 +104,11 @@ func (l *Loader) Restore() error {
 
 	{
 		l.Cmd = exec.Command("python3", l.Fil.Name())
+	}
+
+	if l.Deb {
+		l.Cmd.Stdout = os.Stdout
+		l.Cmd.Stderr = os.Stderr
 	}
 
 	{
@@ -271,8 +277,7 @@ func (l *Loader) cleanup() {
 		//     wait: no child processes
 		//
 		sta, _ := pro.Wait()
-		fmt.Printf("%#v\n", sta)
-		if sta.Exited() {
+		if sta == nil || sta.Exited() {
 			break
 		}
 
