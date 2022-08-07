@@ -147,6 +147,10 @@ func (l *Loader) Restore() error {
 		if err != nil {
 			return tracer.Mask(err)
 		}
+		err = ioutil.WriteFile(l.temfilp(), l.temfilb(), 0664)
+		if err != nil {
+			return tracer.Mask(err)
+		}
 	}
 
 	return nil
@@ -204,15 +208,26 @@ func (l *Loader) Predict(inp map[string][]float32) (float32, error) {
 }
 
 func (l *Loader) Sigkill() error {
-	{
-		err := l.Cmd.Process.Kill()
-		if err != nil {
-			return tracer.Mask(err)
-		}
+	var err error
+
+	err = l.Cmd.Process.Kill()
+	if err != nil {
+		return tracer.Mask(err)
 	}
 
-	{
-		os.Remove(l.Fil.Name())
+	err = os.Remove(l.Fil.Name())
+	if err != nil {
+		return tracer.Mask(err)
+	}
+
+	err = os.Remove(l.pidfilp())
+	if err != nil {
+		return tracer.Mask(err)
+	}
+
+	err = os.Remove(l.temfilp())
+	if err != nil {
+		return tracer.Mask(err)
 	}
 
 	return nil
@@ -250,45 +265,56 @@ func (l *Loader) checker() bool {
 }
 
 func (l *Loader) cleanup() {
-	exi := exists(l.pidfilp())
-	if !exi {
-		return
-	}
-
-	pro, err := os.FindProcess(l.pidfili())
-	if err != nil {
-		panic(err)
-	}
-
-	err = pro.Kill()
-	if IsProcessAlreadyFinished(err) {
-		// fall through
-	} else if err != nil {
-		panic(err)
-	}
-
-	for {
-		// In case a pidfile was found we deal with an orphaned process that
-		// will never be a child process of the current process inspecting the
-		// orphan. Process.Wait will therefore always return an error, which we
-		// simply ignore. All we care about is the exit information of the
-		// orphan.
-		//
-		//     wait: no child processes
-		//
-		sta, _ := pro.Wait()
-		if sta == nil || sta.Exited() {
-			break
+	if exists(l.pidfilp()) {
+		pro, err := os.FindProcess(l.pidfilc())
+		if err != nil {
+			panic(err)
 		}
 
-		{
-			time.After(3 * time.Second)
+		err = pro.Kill()
+		if IsProcessAlreadyFinished(err) {
+			// fall through
+		} else if err != nil {
+			panic(err)
+		}
+
+		for {
+			// In case a pidfile was found we deal with an orphaned process that
+			// will never be a child process of the current process inspecting the
+			// orphan. Process.Wait will therefore always return an error, which we
+			// simply ignore. All we care about is the exit information of the
+			// orphan.
+			//
+			//     wait: no child processes
+			//
+			sta, _ := pro.Wait()
+			if sta == nil || sta.Exited() {
+				break
+			}
+
+			{
+				time.After(3 * time.Second)
+			}
+		}
+
+		err = os.Remove(l.pidfilp())
+		if err != nil {
+			panic(err)
 		}
 	}
 
-	err = os.Remove(l.pidfilp())
-	if err != nil {
-		panic(err)
+	if exists(l.temfilc()) {
+		err := os.Remove(l.temfilc())
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	if exists(l.temfilp()) {
+		err := os.Remove(l.temfilp())
+		if err != nil {
+			panic(err)
+		}
 	}
 }
 
@@ -336,7 +362,7 @@ func (l *Loader) pidfilb() []byte {
 	return []byte(fmt.Sprintf("%d\n", l.Cmd.Process.Pid))
 }
 
-func (l *Loader) pidfili() int {
+func (l *Loader) pidfilc() int {
 	byt, err := ioutil.ReadFile(l.pidfilp())
 	if err != nil {
 		panic(err)
@@ -352,4 +378,21 @@ func (l *Loader) pidfili() int {
 
 func (l *Loader) pidfilp() string {
 	return filepath.Join(l.Pat, "loader.pid")
+}
+
+func (l *Loader) temfilb() []byte {
+	return []byte(l.Fil.Name())
+}
+
+func (l *Loader) temfilc() string {
+	byt, err := ioutil.ReadFile(l.temfilp())
+	if err != nil {
+		panic(err)
+	}
+
+	return strings.TrimSpace(string(byt))
+}
+
+func (l *Loader) temfilp() string {
+	return filepath.Join(l.Pat, "loader.pat")
 }
