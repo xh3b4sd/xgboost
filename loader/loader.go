@@ -303,14 +303,14 @@ func (l *Loader) cleanup() {
 		}
 	}
 
-	if exists(l.temfilc()) {
-		err := os.Remove(l.temfilc())
-		if err != nil {
-			panic(err)
-		}
-	}
-
 	if exists(l.temfilp()) {
+		if exists(l.temfilc()) {
+			err := os.Remove(l.temfilc())
+			if err != nil {
+				panic(err)
+			}
+		}
+
 		err := os.Remove(l.temfilp())
 		if err != nil {
 			panic(err)
