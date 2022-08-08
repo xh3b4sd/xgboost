@@ -101,6 +101,20 @@ func (m *Model) Train() error {
 	}
 
 	{
+		err := m.Fil.Close()
+		if err != nil {
+			return tracer.Mask(err)
+		}
+	}
+
+	{
+		err = ioutil.WriteFile(m.temfilp(), m.temfilb(), 0664)
+		if err != nil {
+			return tracer.Mask(err)
+		}
+	}
+
+	{
 		m.Cmd = exec.Command("python3", m.Fil.Name())
 	}
 
@@ -118,20 +132,6 @@ func (m *Model) Train() error {
 
 	{
 		err := m.Cmd.Wait()
-		if err != nil {
-			return tracer.Mask(err)
-		}
-	}
-
-	{
-		err := m.Fil.Close()
-		if err != nil {
-			return tracer.Mask(err)
-		}
-	}
-
-	{
-		err = ioutil.WriteFile(m.temfilp(), m.temfilb(), 0664)
 		if err != nil {
 			return tracer.Mask(err)
 		}
