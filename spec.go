@@ -1,8 +1,14 @@
 package xgboost
 
-type Fitter interface {
-	Models()
-	Single()
+type Ensemble interface {
+	Train() error
+}
+
+type Model interface {
+	// Execute returns the rendered template of the Python script used to spawn
+	// a child process for training.
+	Execute() ([]byte, error)
+	Train() error
 }
 
 // Loader describes how boosters can be restored and used for predictions.
