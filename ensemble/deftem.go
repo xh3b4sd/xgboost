@@ -1,4 +1,4 @@
-package model
+package ensemble
 
 const deftem = `
 import json
@@ -11,29 +11,36 @@ import xgboost as xgb
 
 ################################################################################
 
-BUFFER = "{{ .Buf }}"
-
-################################################################################
-
-context = {
-{{- range $b := .Buc }}
-    "{{ $b }}": {},
+BUFFER = [
+{{- range $b := .Buf }}
+    "{{ $b }}",
 {{- end }}
-}
+]
+
+BUFFER.sort()
 
 ################################################################################
 
-def build_ensemble_matrix(context, path):
-  c = pd.read_csv(path, header=None)
+BUCKET = [
+{{- range $b := .Buc }}
+    "{{ $b }}",
+{{- end }}
+]
 
-  f = c.copy()
-  l = f.pop(0)
+################################################################################
 
-  x = xgb.DMatrix(f, l)
+def build_ensemble_matrix(context, subset):
+  l = {}
   p = []
 
-  for k, v in context.items():
-    p.append(v["mod"].predict(x, iteration_range=(0, v["mod"].best_iteration + 1)))
+  for buf in BUFFER:
+    f = context[buf]["ens"][subset].copy()
+    l = f.pop(0)
+
+    m = xgb.DMatrix(f, l)
+
+    for buc in BUCKET:
+      p.append(context[buf]["mod"][buc].predict(m, iteration_range=(0, context[buf]["mod"][buc].best_iteration + 1)))
 
   y_true = []
 
@@ -49,20 +56,37 @@ def build_ensemble_matrix(context, path):
 
 ################################################################################
 
-def build_model_matrix(path):
-  fea = []
-  lab = []
+def fill_ens(context):
+  for buf in BUFFER:
+    context[buf] = {
+        "ens": {
+            "tra": pd.read_csv("{{ .Pat }}" + "/" + buf + "/ens/tra.csv", header=None),
+            "tes": pd.read_csv("{{ .Pat }}" + "/" + buf + "/ens/tes.csv", header=None),
+            "val": pd.read_csv("{{ .Pat }}" + "/" + buf + "/ens/val.csv", header=None),
+        }
+    }
 
-  for p in path:
-    c = pd.read_csv(p, header=None)
+  return context
 
-    f = c.copy()
-    l = f.pop(0)
+################################################################################
 
-    fea.append(f)
-    lab.append(l)
+def fill_mod(context):
+  for buf in BUFFER:
+    context[buf]["mod"] = {}
 
-  return xgb.DMatrix(pd.concat(fea, axis=0, ignore_index=True), pd.concat(lab, axis=0, ignore_index=True))
+    for buc in BUCKET:
+      context[buf]["mod"][buc] = load_model("{{ .Pat }}" + "/" + buf + "/mod/" + buc + ".ubj")
+
+  return context
+
+################################################################################
+
+def load_model(p):
+  m = xgb.Booster()
+
+  m.load_model(p)
+
+  return m
 
 ################################################################################
 
@@ -94,28 +118,26 @@ def train_model(params, tra_mat, val_mat, evl_res=None):
 
 ################################################################################
 
-for k, v in context.items():
-  context[k]["tra_mat"] = build_model_matrix(["{{ .Pat }}" + "/" + BUFFER + "/csv/" + k + ".tra.csv"])
-  context[k]["tes_mat"] = build_model_matrix(["{{ .Pat }}" + "/" + BUFFER + "/csv/" + k + ".tes.csv"])
-  context[k]["val_mat"] = build_model_matrix(["{{ .Pat }}" + "/" + BUFFER + "/csv/" + k + ".val.csv"])
+context = {}
 
 ################################################################################
 
-for k, v in context.items():
-  print("train model " + k)
-  context[k]["mod"] = train_model(model_params(), context[k]["tra_mat"], context[k]["val_mat"])
+context = fill_ens(context)
+context = fill_mod(context)
 
 ################################################################################
 
-tra_mat = build_ensemble_matrix(context, "{{ .Pat }}" + "/" + BUFFER + "/ful/tra.csv")
-tes_mat = build_ensemble_matrix(context, "{{ .Pat }}" + "/" + BUFFER + "/ful/tes.csv")
-val_mat = build_ensemble_matrix(context, "{{ .Pat }}" + "/" + BUFFER + "/ful/val.csv")
+labels = [-1, 0, +1]
 
 ################################################################################
 
-# train 3 classes because of target labels [-1, 0, +1]
-print("train ensemble")
-ensemble = train_model(model_params(num_class=3), tra_mat, val_mat)
+tra_mat = build_ensemble_matrix(context, "tra")
+tes_mat = build_ensemble_matrix(context, "tes")
+val_mat = build_ensemble_matrix(context, "val")
+
+################################################################################
+
+ensemble = train_model(model_params(num_class=len(labels)), tra_mat, val_mat)
 
 ################################################################################
 
@@ -138,13 +160,11 @@ print("pre_sco:", pre_sco)
 
 ################################################################################
 
-if log_err < {{ .Log }} and pre_sco > {{ .Pre }}:
-  for k, v in context.items():
-    v["mod"].save_model("{{ .Pat }}" + "/" + BUFFER + "/mod/" + k + ".ubj")
+ensemble.save_model("{{ .Pat }}" + "/ensemble.ubj")
 
 ################################################################################
 
-pathlib.Path("{{ .Pat }}" + "/" + BUFFER + "/res/").mkdir(exist_ok=True)
-with open("{{ .Pat }}" + "/" + BUFFER + "/res/res.json", 'a') as the_file:
+pathlib.Path("{{ .Pat }}" + "/res/").mkdir(exist_ok=True)
+with open("{{ .Pat }}" + "/res/res.json", 'a') as the_file:
     the_file.write(json.dumps({"log_err": log_err.astype(float), "pre_sco": pre_sco.astype(float)}) + '\n')
 `
