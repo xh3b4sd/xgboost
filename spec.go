@@ -1,6 +1,9 @@
 package xgboost
 
 type Ensemble interface {
+	// Execute returns the rendered template of the Python script used to spawn
+	// a child process for training.
+	Execute() ([]byte, error)
 	Train() error
 }
 
@@ -15,6 +18,7 @@ type Model interface {
 //
 //     ldr := &loader.Loader{
 //         Buc: []string{ ... },
+//         Buf: []string{ ... },
 //         Pat: "/Users/xh3b4sd/dat/",
 //         Por: 8080,
 //     }

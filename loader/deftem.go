@@ -32,11 +32,7 @@ def build_ensemble_matrix(context):
   p = []
 
   for buf in BUFFER:
-    f = context[buf]["ens"].copy()
-
-    f.pop(0)
-
-    m = xgb.DMatrix(f)
+    m = xgb.DMatrix(context[buf]["ens"])
 
     for buc in BUCKET:
       p.append(context[buf]["mod"][buc].predict(m, iteration_range=(0, context[buf]["mod"][buc].best_iteration + 1)))
@@ -47,7 +43,9 @@ def build_ensemble_matrix(context):
 
 def fill_ens(context, input):
   for buf in BUFFER:
-    context[buf]["ens"] = pd.DataFrame([input[buf]])
+    f = pd.DataFrame([input[buf]]).copy()
+    f.pop(0)
+    context[buf]["ens"] = f.astype('float')
 
   return context
 

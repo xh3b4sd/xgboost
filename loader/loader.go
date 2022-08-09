@@ -21,6 +21,8 @@ type Loader struct {
 	Add string
 	// Buc is the required bucket list.
 	Buc []string
+	// Buf is the required list of buffer hashes for loading this ensemble.
+	Buf []string
 	Cli *http.Client
 	Cmd *exec.Cmd
 	Deb bool
@@ -306,6 +308,10 @@ func (l *Loader) configs() {
 		panic("Loader.Buc must not be empty")
 	}
 
+	if len(l.Buf) == 0 {
+		panic("Ensemble.Buf must not be empty")
+	}
+
 	if l.Cli == nil {
 		l.Cli = &http.Client{}
 	}
@@ -331,7 +337,7 @@ func (l *Loader) mapping() map[string]interface{} {
 	return map[string]interface{}{
 		"Add": l.Add,
 		"Buc": l.Buc,
-		"Buf": buffer(l.Pat),
+		"Buf": l.Buf,
 		"Pat": strings.TrimSuffix(l.Pat, "/"),
 		"Por": l.Por,
 	}
