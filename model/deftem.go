@@ -66,6 +66,12 @@ def build_model_matrix(path):
 
 ################################################################################
 
+def create_models(context):
+  for k, v in context.items():
+    v["mod"].save_model("{{ .Pat }}" + "/" + BUFFER + "/mod/" + k + ".ubj")
+
+################################################################################
+
 def model_params(num_class=2):
   return {
     "booster": "gbtree",
@@ -79,7 +85,7 @@ def model_params(num_class=2):
 
 ################################################################################
 
-def train_model(params, tra_mat, val_mat, evl_res=None):
+def train_model(params, tra_mat, val_mat, evl_res=None, xgb_mod=None):
   return xgb.train(
     params,
     tra_mat,
@@ -90,6 +96,7 @@ def train_model(params, tra_mat, val_mat, evl_res=None):
     evals=[(tra_mat, 'tra_mat'), (val_mat, 'val_mat')],
     evals_result=evl_res,
     verbose_eval=100,
+    xgb_model=xgb_mod,
   )
 
 ################################################################################
@@ -103,7 +110,14 @@ for k, v in context.items():
 
 for k, v in context.items():
   print("train model " + k)
-  context[k]["mod"] = train_model(model_params(), context[k]["tra_mat"], context[k]["val_mat"])
+  context[k]["mod"] = train_model(
+    model_params(),
+    context[k]["tra_mat"],
+    context[k]["val_mat"],
+{{- if .Upd }}
+    xgb_mod="{{ .Pat }}" + "/" + BUFFER + "/mod/" + k + ".ubj",
+{{- end }}
+  )
 
 ################################################################################
 
@@ -137,10 +151,12 @@ pre_sco = skl.metrics.precision_score(y_true, y_pred, average="weighted")
 print("pre_sco:", pre_sco)
 
 ################################################################################
-
+{{ if .Upd }}
+create_models(context)
+{{- else }}
 if log_err < {{ .Log }} and pre_sco > {{ .Pre }}:
-  for k, v in context.items():
-    v["mod"].save_model("{{ .Pat }}" + "/" + BUFFER + "/mod/" + k + ".ubj")
+  create_models(context)
+{{- end }}
 
 ################################################################################
 

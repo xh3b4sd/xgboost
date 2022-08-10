@@ -47,6 +47,9 @@ type Model struct {
 	// Tem is the required Python script template that is first being rendered
 	// and persisted, and then executed in a child process.
 	Tem string
+	// Upd requires a model to exist in order for it to continue training on the
+	// prepared data set.
+	Upd bool
 }
 
 func (m *Model) Execute() ([]byte, error) {
@@ -193,6 +196,7 @@ func (m *Model) mapping() map[string]interface{} {
 		"Log": m.Log,
 		"Pat": strings.TrimSuffix(m.Pat, "/"),
 		"Pre": m.Pre,
+		"Upd": m.Upd,
 	}
 }
 
