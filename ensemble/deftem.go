@@ -34,25 +34,40 @@ def build_ensemble_matrix(context, subset):
   p = []
 
   for buf in BUFFER:
-    f = context[buf]["ens"][subset].copy()
+    f = context[buf]["ens"][subset].copy().astype('float')
     l = f.pop(0)
 
     m = xgb.DMatrix(f, l)
 
     for buc in BUCKET:
-      p.append(context[buf]["mod"][buc].predict(m, iteration_range=(0, context[buf]["mod"][buc].best_iteration + 1)))
+      pre = context[buf]["mod"][buc].predict(m, iteration_range=(0, context[buf]["mod"][buc].best_iteration + 1))
+      p.append(normalize(pre))
 
   y_true = []
 
   for y in l:
-    if y == 4:
-      y_true.append(1)
-    elif y < 4:
-      y_true.append(2)
-    elif y > 4:
-      y_true.append(0)
+    if y == 5:
+      y_true.append(0.5)
+    elif y < 5:
+      y_true.append(1.0)
+    elif y > 5:
+      y_true.append(0.0)
 
   return xgb.DMatrix(pd.DataFrame(p).transpose(), pd.DataFrame(y_true))
+
+################################################################################
+
+def ensemble_params():
+  return {
+    "base_score": 0.50,
+    "booster": "gbtree",
+    "gamma": 10.00,
+    "grow_policy": "lossguide",
+    "learning_rate": 0.02,
+    "max_depth": 20,
+    "objective": "reg:logistic",
+    "eval_metric": ["error", "logloss"],
+  }
 
 ################################################################################
 
@@ -90,20 +105,16 @@ def load_model(p):
 
 ################################################################################
 
-def model_params(num_class=2):
-  return {
-    "booster": "gbtree",
-    "grow_policy": "lossguide",
-    "learning_rate": 0.02,
-    "max_depth": 200,
-    "objective": "multi:softmax",
-    "num_class": num_class,
-    "eval_metric": ["merror", "mlogloss"],
-  }
+def normalize(l):
+  l = np.where(l > 0.85, 1, l)
+  l = np.where(((l >= 0.15) & (l <= 0.85)), 0.5, l)
+  l = np.where(l < 0.15, 0, l)
+
+  return l
 
 ################################################################################
 
-def train_model(params, tra_mat, val_mat, evl_res=None):
+def train_model(params, tra_mat, val_mat, evl_res=None, xgb_mod=None):
   return xgb.train(
     params,
     tra_mat,
@@ -114,6 +125,7 @@ def train_model(params, tra_mat, val_mat, evl_res=None):
     evals=[(tra_mat, 'tra_mat'), (val_mat, 'val_mat')],
     evals_result=evl_res,
     verbose_eval=100,
+    xgb_model=xgb_mod,
   )
 
 ################################################################################
@@ -127,17 +139,20 @@ context = fill_mod(context)
 
 ################################################################################
 
-labels = [-1, 0, +1]
-
-################################################################################
-
 tra_mat = build_ensemble_matrix(context, "tra")
 tes_mat = build_ensemble_matrix(context, "tes")
 val_mat = build_ensemble_matrix(context, "val")
 
 ################################################################################
 
-ensemble = train_model(model_params(num_class=len(labels)), tra_mat, val_mat)
+ensemble = train_model(
+  ensemble_params(),
+  tra_mat,
+  val_mat,
+{{- if .Upd }}
+  xgb_mod="{{ .Pat }}" + "/ensemble.ubj",
+{{- end }}
+)
 
 ################################################################################
 
@@ -146,7 +161,7 @@ pre_mat = ensemble.predict(tes_mat, iteration_range=(0, ensemble.best_iteration 
 ################################################################################
 
 y_true = tes_mat.get_label()
-y_pred = pre_mat
+y_pred = normalize(pre_mat)
 
 ################################################################################
 
@@ -155,16 +170,11 @@ print("log_err:", log_err)
 
 ################################################################################
 
-pre_sco = skl.metrics.precision_score(y_true, y_pred, average="weighted")
-print("pre_sco:", pre_sco)
-
-################################################################################
-
 ensemble.save_model("{{ .Pat }}" + "/ensemble.ubj")
 
 ################################################################################
 
 pathlib.Path("{{ .Pat }}" + "/res/").mkdir(exist_ok=True)
-with open("{{ .Pat }}" + "/res/res.json", 'a') as the_file:
-    the_file.write(json.dumps({"log_err": log_err.astype(float), "pre_sco": pre_sco.astype(float)}) + '\n')
+with open("{{ .Pat }}" + "/res/res.json", 'w') as the_file:
+    the_file.write(json.dumps({"log_err": log_err.astype(float)}) + '\n')
 `
