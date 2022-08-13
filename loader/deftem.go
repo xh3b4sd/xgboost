@@ -3,6 +3,7 @@ package loader
 const deftem = `
 import json
 
+import numpy as np
 import pandas as pd
 import xgboost as xgb
 
@@ -35,7 +36,8 @@ def build_ensemble_matrix(context):
     m = xgb.DMatrix(context[buf]["ens"])
 
     for buc in BUCKET:
-      p.append(context[buf]["mod"][buc].predict(m, iteration_range=(0, context[buf]["mod"][buc].best_iteration + 1)))
+      pre = context[buf]["mod"][buc].predict(m, iteration_range=(0, context[buf]["mod"][buc].best_iteration + 1))
+      p.append(normalize(pre))
 
   return xgb.DMatrix(pd.DataFrame(p).transpose())
 
@@ -75,6 +77,15 @@ def load_model(p):
 
 ################################################################################
 
+def normalize(l):
+  l = np.where(l > 0.85, 1, l)
+  l = np.where(((l >= 0.15) & (l <= 0.85)), 0.5, l)
+  l = np.where(l < 0.15, 0, l)
+
+  return l
+
+################################################################################
+
 context = fill_mod({})
 
 ################################################################################
@@ -96,7 +107,7 @@ class S(BaseHTTPRequestHandler):
         pre_mat = context["ens"].predict(tes_mat, iteration_range=(0, context["ens"].best_iteration + 1))
 
         self._set_response()
-        self.wfile.write(f'{pre_mat[0]:.1f}'.encode())
+        self.wfile.write(f'{pre_mat[0]:.3f}'.encode())
 
     def log_message(self, format, *args):
         return

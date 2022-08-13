@@ -41,9 +41,6 @@ type Model struct {
 	//     └── ensemble.ubj
 	//
 	Pat string
-	// Pre is the required minimum precision score a trained model must meet in
-	// order to be considered valid.
-	Pre float32
 	// Tem is the required Python script template that is first being rendered
 	// and persisted, and then executed in a child process.
 	Tem string
@@ -180,10 +177,6 @@ func (m *Model) configs() {
 		panic("Model.Pat must not be empty")
 	}
 
-	if m.Pre == 0 {
-		panic("Model.Pre must not be empty")
-	}
-
 	if m.Tem == "" {
 		m.Tem = deftem
 	}
@@ -195,7 +188,6 @@ func (m *Model) mapping() map[string]interface{} {
 		"Buf": m.Buf,
 		"Log": m.Log,
 		"Pat": strings.TrimSuffix(m.Pat, "/"),
-		"Pre": m.Pre,
 		"Upd": m.Upd,
 	}
 }

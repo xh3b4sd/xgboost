@@ -41,6 +41,9 @@ type Ensemble struct {
 	// Tem is the required Python script template that is first being rendered
 	// and persisted, and then executed in a child process.
 	Tem string
+	// Upd requires an ensemble to exist in order for it to continue training on
+	// the prepared data set.
+	Upd bool
 }
 
 func (e *Ensemble) Execute() ([]byte, error) {
@@ -177,6 +180,7 @@ func (e *Ensemble) mapping() map[string]interface{} {
 		"Buc": e.Buc,
 		"Buf": e.Buf,
 		"Pat": strings.TrimSuffix(e.Pat, "/"),
+		"Upd": e.Upd,
 	}
 }
 
